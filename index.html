@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Laser Wedding Invitation Generator</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <aside id="sidebar">
+    <header>
+      <h1>Wedding Invitation</h1>
+      <p class="sub">Laser-cut gatefold &middot; 5&times;7&Prime; panel &middot; live preview</p>
+    </header>
+
+    <section>
+      <h2>Headline</h2>
+      <label>Tagline
+        <input id="tagline" type="text">
+      </label>
+      <div class="row">
+        <label>Small word 1
+          <input id="lineThe" type="text">
+        </label>
+        <label>Small word 2
+          <input id="lineOf" type="text">
+        </label>
+      </div>
+      <label>Title
+        <input id="title" type="text">
+      </label>
+    </section>
+
+    <section>
+      <h2>Couple</h2>
+      <div class="row">
+        <label>First name
+          <input id="name1" type="text">
+        </label>
+        <label>Second name
+          <input id="name2" type="text">
+        </label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Date &amp; time</h2>
+      <div class="row">
+        <label>Day of week
+          <input id="dayOfWeek" type="text">
+        </label>
+        <label>Time
+          <input id="time" type="text">
+        </label>
+      </div>
+      <div class="row three">
+        <label>Month
+          <input id="month" type="text">
+        </label>
+        <label>Day
+          <input id="dayNum" type="text">
+        </label>
+        <label>Year
+          <input id="year" type="text">
+        </label>
+      </div>
+    </section>
+
+    <section>
+      <h2>Venue &amp; details</h2>
+      <label>Venue
+        <input id="venue" type="text">
+      </label>
+      <label>Address (one line per row)
+        <textarea id="address" rows="2"></textarea>
+      </label>
+      <label>RSVP line
+        <input id="rsvp" type="text">
+      </label>
+      <label>Footer line
+        <input id="footer" type="text">
+      </label>
+    </section>
+
+    <section>
+      <h2>Design</h2>
+      <label class="check"><input id="showDoors" type="checkbox"> Lace fold-out doors</label>
+      <label class="check"><input id="showHeart" type="checkbox"> Heart on right door</label>
+      <button id="shuffle" type="button" class="ghost">&#x21bb; Shuffle lace pattern</button>
+    </section>
+
+    <section>
+      <h2>Export</h2>
+      <button id="export-laser" type="button" class="primary">Download laser-ready SVG</button>
+      <p class="hint">Text traced to outlines &middot; <span class="swatch red"></span> red = cut &middot; <span class="swatch black"></span> black = engrave &middot; real mm units</p>
+      <button id="export-editable" type="button" class="ghost">Download SVG with editable text</button>
+      <p id="export-status" class="hint status"></p>
+    </section>
+  </aside>
+
+  <main id="stage">
+    <div id="preview"></div>
+  </main>
+
+  <script src="vendor/opentype.min.js"></script>
+  <script src="js/lattice.js"></script>
+  <script src="js/template.js"></script>
+  <script src="js/textpaths.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
