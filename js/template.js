@@ -335,6 +335,15 @@ function doorGroup(side, seed, withHeart) {
   return g;
 }
 
+/**
+ * Motif slot helper: returns the swappable graphic's nodes, or null when the
+ * motif is 'none' (callers then draw their classic ornament instead).
+ */
+function motifOrNull(s, box) {
+  if (!s.motif || s.motif === 'none') return null;
+  return motifNodes(s.motif, { ...box, seed: s.seed, initials: s.initials });
+}
+
 function panelGroup(s) {
   const { panelX, panelW, H, cx } = GEO;
   const r = 4;
@@ -365,7 +374,9 @@ function panelGroup(s) {
 
   /* --- engraved content, top to bottom --- */
 
-  g.append(...ornament(cx, 20));
+  const motif = motifOrNull(s, { cx, top: 7.5, h: 18 });
+  if (motif) g.append(...motif);
+  else g.append(...ornament(cx, 20));
 
   g.append(textEl(s.tagline, cx, 31, { size: 5.2, ls: 1.2, maxW: 100 }));
 
@@ -412,11 +423,98 @@ function panelGroup(s) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Arch die-cut template                                               */
+/*                                                                     */
+/* A single 5 x 7 in card with a full-arch top (the big 2026 die-cut   */
+/* trend): fine double border, swappable motif in the dome, stacked    */
+/* script names, oversized date row, small-caps details.               */
+/* ------------------------------------------------------------------ */
+
+const ARCH = { W: 127, H: 178, cx: 63.5, r: 63.5 };
+
+/** Arch outline path inset by d, with small rounded bottom corners. */
+function archPath(d, corner = 2.5) {
+  const { W, H, r } = ARCH;
+  return (
+    `M ${d} ${r} ` +
+    `A ${r - d} ${r - d} 0 0 1 ${W - d} ${r} ` +
+    `L ${W - d} ${H - d - corner} ` +
+    `Q ${W - d} ${H - d} ${W - d - corner} ${H - d} ` +
+    `L ${d + corner} ${H - d} ` +
+    `Q ${d} ${H - d} ${d} ${H - d - corner} Z`
+  );
+}
+
+function archGroup(s) {
+  const { cx } = ARCH;
+  const g = el('g', { id: 'arch-card' });
+
+  g.append(el('path', { d: archPath(0), class: 'board', 'data-layer': 'cut' }));
+
+  // Fine double border echoing the die-cut edge.
+  for (const d of [4, 5.6]) {
+    g.append(
+      el('path', { d: archPath(d), class: 'ink-line', 'data-layer': 'engrave-line' })
+    );
+  }
+
+  // Swappable graphic inside the dome.
+  const motif = motifOrNull(s, { cx, top: 20, h: 34 });
+  if (motif) g.append(...motif);
+  else g.append(...ornament(cx, 40));
+
+  g.append(textEl(s.tagline, cx, 63, { size: 4.6, ls: 1.1, maxW: 96 }));
+
+  // Stacked script names - mixed typography trend.
+  g.append(textEl(s.name1, cx, 80, { font: 'script', size: 12.5, maxW: 100 }));
+  g.append(textEl('&', cx, 89.5, { font: 'serifItalic', size: 6, maxW: 20 }));
+  g.append(textEl(s.name2, cx, 102.5, { font: 'script', size: 12.5, maxW: 100 }));
+
+  // Oversized date row: MONTH  20  YEAR with dot separators.
+  g.append(textEl(s.month, cx - 26, 121.5, { size: 5, ls: 1.2, maxW: 26 }));
+  g.append(textEl(s.dayNum, cx, 123, { font: 'serifSemi', size: 13.5, maxW: 20 }));
+  g.append(textEl(s.year, cx + 26, 121.5, { size: 5, ls: 1.2, maxW: 26 }));
+  for (const dx of [-13.5, 13.5]) {
+    g.append(
+      el('circle', { cx: cx + dx, cy: 119.5, r: 0.7, class: 'ink', 'data-layer': 'engrave' })
+    );
+  }
+
+  const dowTime = [s.dayOfWeek, s.time].filter(Boolean).join('  ·  ');
+  g.append(textEl(dowTime, cx, 131.5, { size: 4.4, ls: 0.8, maxW: 100 }));
+
+  g.append(el('rect', barAttrs(cx - 7, 138.5, 14, 0.4)));
+
+  g.append(textEl(s.venue, cx, 145.5, { size: 5.4, ls: 1, maxW: 104 }));
+  s.addressLines.forEach((line, i) => {
+    g.append(textEl(line, cx, 152 + i * 5.6, { size: 4.4, maxW: 104 }));
+  });
+  g.append(textEl(s.rsvp, cx, 163.5, { size: 4.4, maxW: 98 }));
+  g.append(textEl(s.footer, cx, 169.8, { size: 4, ls: 0.7, maxW: 98 }));
+
+  return g;
+}
+
+/* ------------------------------------------------------------------ */
 /* Whole document                                                      */
 /* ------------------------------------------------------------------ */
 
 function buildInvitationSVG(strings, opts) {
   const m = GEO.margin;
+  const s = { ...strings, motif: opts.motif, seed: opts.seed };
+
+  if (opts.template === 'arch') {
+    const svg = el('svg', {
+      xmlns: NS,
+      viewBox: `${-m} ${-m} ${ARCH.W + 2 * m} ${ARCH.H + 2 * m}`,
+      width: ARCH.W + 2 * m + 'mm',
+      height: ARCH.H + 2 * m + 'mm',
+    });
+    svg.append(archGroup(s));
+    return svg;
+  }
+
+  // Gatefold template.
   const x0 = opts.showDoors ? -m : GEO.panelX - m;
   const w = opts.showDoors ? GEO.totalW + 2 * m : GEO.panelW + 2 * m;
   const h = GEO.H + 2 * m;
@@ -432,6 +530,6 @@ function buildInvitationSVG(strings, opts) {
     svg.append(doorGroup('left', opts.seed, false));
     svg.append(doorGroup('right', opts.seed, opts.showHeart));
   }
-  svg.append(panelGroup({ ...strings, showDoors: opts.showDoors }));
+  svg.append(panelGroup({ ...s, showDoors: opts.showDoors }));
   return svg;
 }

@@ -20,6 +20,8 @@ const state = {
   address: '1284 Riverbend Lane,\nCedar Falls, Iowa',
   rsvp: 'RSVP by May 1st, 2026',
   footer: 'Dinner & Dancing to Follow',
+  template: 'arch',
+  motif: 'tree',
   showDoors: true,
   showHeart: true,
   seed: 7,
@@ -42,6 +44,10 @@ function displayStrings() {
   }
   out.names = [out.name1, out.name2].filter(Boolean).join('  &  ');
   out.addressLines = out.address ? out.address.split('\n').map((l) => l.trim()).filter(Boolean) : [];
+  out.initials = [out.name1, out.name2]
+    .filter(Boolean)
+    .map((n) => n[0].toUpperCase())
+    .join(' & ');
   return out;
 }
 
@@ -52,7 +58,10 @@ function displayStrings() {
 const previewBox = document.getElementById('preview');
 
 function render() {
+  document.body.dataset.template = state.template;
   const svg = buildInvitationSVG(displayStrings(), {
+    template: state.template,
+    motif: state.motif,
     showDoors: state.showDoors,
     showHeart: state.showHeart,
     seed: state.seed,
@@ -154,6 +163,19 @@ function bind() {
     box.checked = state[k];
     box.addEventListener('change', () => {
       state[k] = box.checked;
+      render();
+    });
+  }
+
+  const motifSel = document.getElementById('motif');
+  for (const [id, m] of Object.entries(MOTIFS)) {
+    motifSel.append(new Option(m.label, id));
+  }
+  for (const k of ['template', 'motif']) {
+    const sel = document.getElementById(k);
+    sel.value = state[k];
+    sel.addEventListener('change', () => {
+      state[k] = sel.value;
       render();
     });
   }

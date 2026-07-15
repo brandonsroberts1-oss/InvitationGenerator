@@ -85,7 +85,10 @@ label {
   color: var(--muted);
 }
 
+body[data-template='arch'] .only-gatefold { display: none; }
+
 input[type='text'],
+select,
 textarea {
   display: block;
   width: 100%;
@@ -101,6 +104,7 @@ textarea {
 }
 
 input[type='text']:focus,
+select:focus,
 textarea:focus {
   outline: none;
   border-color: var(--accent);
@@ -186,14 +190,16 @@ button.ghost {
 }
 
 #preview {
-  max-width: min(1150px, 100%);
-  width: 100%;
+  max-width: 100%;
 }
 
+/* Scale to the viewport height; wide layouts clamp to the stage width. */
 #preview svg {
   display: block;
-  width: 100%;
-  height: auto;
+  margin: 0 auto;
+  height: calc(100vh - 60px);
+  width: auto;
+  max-width: calc(100vw - 330px - 56px);
   filter: drop-shadow(0 14px 22px rgba(0, 0, 0, 0.45));
 }
 
