@@ -347,6 +347,147 @@ function buildRings({ cx, top, h }) {
 }
 
 /* ------------------------------------------------------------------ */
+/* Encompassing border art (used by whole templates, not the slot)     */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Generative botanical vine hugging the whole arch border: a gently waving
+ * engraved stem climbing both sides and over the dome, dressed with leaves,
+ * five-petal flowers and berries. Purely engrave layers.
+ */
+function buildBorderVine({ seed = 1 }) {
+  const rng = mulberry32(((seed * 7919 + 3) >>> 0) || 9);
+  const nodes = [];
+
+  // Border track: up the left side, over the dome, down the right side.
+  const R = 55;
+  const cxA = 63.5;
+  const cyA = 63.5;
+  const xL = 8.5;
+  const xR = 118.5;
+  const yBot = 169;
+  const sideLen = yBot - cyA;
+  const arcLen = Math.PI * R;
+  const total = 2 * sideLen + arcLen;
+
+  // Point + inward normal + tangent angle at distance d along the track.
+  const at = (d) => {
+    if (d < sideLen) return { p: [xL, yBot - d], n: [1, 0], th: -Math.PI / 2 };
+    if (d < sideLen + arcLen) {
+      const a = Math.PI - (d - sideLen) / R;
+      return {
+        p: [cxA + R * Math.cos(a), cyA - R * Math.sin(a)],
+        n: [-Math.cos(a), Math.sin(a)],
+        th: Math.atan2(Math.cos(a), Math.sin(a)),
+      };
+    }
+    const d3 = d - sideLen - arcLen;
+    return { p: [xR, cyA + d3], n: [-1, 0], th: Math.PI / 2 };
+  };
+
+  const amp = 1.4;
+  const wave = (d) => amp * Math.sin((d / 16) * 2 * Math.PI);
+  const ptAt = (d) => {
+    const { p, n } = at(d);
+    const w = wave(d);
+    return [p[0] + n[0] * w, p[1] + n[1] * w];
+  };
+
+  // Stem.
+  const stem = [];
+  for (let d = 0; d <= total; d += 1.6) stem.push(ptAt(d));
+  nodes.push(linePath('M ' + stem.map(fmtP).join(' L ')));
+
+  // Curled tips at both ends, hooking inward.
+  for (const end of [0, total]) {
+    const { p, n, th } = at(end);
+    const back = end === 0 ? [Math.cos(th + Math.PI), Math.sin(th + Math.PI)] : [Math.cos(th), Math.sin(th)];
+    const c1 = [p[0] + back[0] * 3 + n[0] * 1.2, p[1] + back[1] * 3 + n[1] * 1.2];
+    const c2 = [p[0] + back[0] * 5 + n[0] * 4.2, p[1] + back[1] * 5 + n[1] * 4.2];
+    nodes.push(linePath(`M ${fmtP(p)} Q ${fmtP(c1)} ${fmtP(c2)}`));
+    nodes.push(inkDot(c2, 0.85));
+  }
+
+  // Flower positions first, so leaves can keep out of their way.
+  const flowerDs = [];
+  for (let d = 20; d < total - 15; d += 44 + rng() * 12) flowerDs.push(d);
+
+  // Leaves: alternate sides; inward leaves are long, outward leaves hug the
+  // border so nothing gets near the cut edge.
+  let flip = 1;
+  for (let d = 7; d < total - 7; d += 8.5) {
+    if (flowerDs.some((f) => Math.abs(f - d) < 6)) continue;
+    flip = -flip;
+    const { th } = at(d);
+    const inward = flip === 1;
+    const mag = inward ? 1 + rng() * 0.25 : 0.55 + rng() * 0.15;
+    const len = (inward ? 5.4 : 4.6) + rng() * 1.2;
+    const place = rotateAbout(ptAt(d), th + flip * mag);
+    nodes.push(inkPath(segsToPath(transformSegs(petalSegs(len, 1.95), place))));
+  }
+
+  // Berries: small inward dot pairs between leaves.
+  for (let d = 16; d < total - 10; d += 29) {
+    const { n } = at(d);
+    const base = ptAt(d);
+    nodes.push(inkDot([base[0] + n[0] * 3.4, base[1] + n[1] * 3.4], 0.95));
+    nodes.push(inkDot([base[0] + n[0] * 5.2, base[1] + n[1] * 5.2], 0.7));
+  }
+
+  // Five-petal flowers, offset slightly inward from the stem.
+  for (const d of flowerDs) {
+    const { n } = at(d);
+    const base = ptAt(d);
+    const c = [base[0] + n[0] * 3, base[1] + n[1] * 3];
+    const a0 = rng() * Math.PI;
+    for (let k = 0; k < 5; k++) {
+      const A = a0 + (k * 2 * Math.PI) / 5;
+      const tip = [c[0] + 1.5 * Math.cos(A), c[1] + 1.5 * Math.sin(A)];
+      nodes.push(inkPath(segsToPath(transformSegs(petalSegs(3.6, 1.9), rotateAbout(tip, A)))));
+    }
+    nodes.push(inkDot(c, 1.15));
+  }
+
+  return nodes;
+}
+
+/**
+ * Small botanical spray tucked into a corner of the wavy card.
+ * corner = world corner point, dir = [+-1, +-1] pointing into the card.
+ */
+function buildCornerSpray({ corner, dir }) {
+  const M = (p) => [corner[0] + p[0] * dir[0], corner[1] + p[1] * dir[1]];
+  const nodes = [];
+
+  // Curved stem.
+  const P0 = [5.5, 9.5];
+  const C = [13, 10.5];
+  const P1 = [19.5, 18.5];
+  nodes.push(linePath(`M ${fmtP(M(P0))} Q ${fmtP(M(C))} ${fmtP(M(P1))}`));
+
+  // Leaves fanned along the stem.
+  let flip = 1;
+  for (const t of [0.15, 0.45, 0.75]) {
+    const u = 1 - t;
+    const q = [
+      u * u * P0[0] + 2 * u * t * C[0] + t * t * P1[0],
+      u * u * P0[1] + 2 * u * t * C[1] + t * t * P1[1],
+    ];
+    const tx = 2 * u * (C[0] - P0[0]) + 2 * t * (P1[0] - C[0]);
+    const ty = 2 * u * (C[1] - P0[1]) + 2 * t * (P1[1] - C[1]);
+    const th = Math.atan2(ty, tx);
+    flip = -flip;
+    const place = rotateAbout(q, th + flip * 0.85);
+    nodes.push(inkPath(segsToPath(transformSegs(petalSegs(5.6, 2), (p) => M(place(p))))));
+  }
+
+  nodes.push(inkDot(M([21.5, 20.5]), 1));
+  nodes.push(inkDot(M([8, 5]), 0.8));
+  nodes.push(inkDot(M([3.5, 13.5]), 0.8));
+  return nodes;
+}
+
+/* ------------------------------------------------------------------ */
 
 const MOTIFS = {
   none: { label: 'None (classic ornament)', build: null },

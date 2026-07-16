@@ -262,7 +262,7 @@ function doorRegion(doorPoly, holes, heartPoly) {
   };
 }
 
-function doorGroup(side, seed, withHeart) {
+function doorGroup(side, seed, withHeart, style = 'crackle') {
   const segs = side === 'left' ? leftDoorSegs() : rightDoorSegs();
   const poly = segsToPolygon(segs);
   const x0 = side === 'left' ? 0 : GEO.rightDoorX;
@@ -283,13 +283,21 @@ function doorGroup(side, seed, withHeart) {
     })
   );
 
-  const cutouts = generateLattice({
-    bbox: [x0, 0, x0 + GEO.doorW, GEO.H],
-    inside: doorRegion(poly, holes, heartPoly),
-    seed: seed + (side === 'left' ? 0 : 101),
-  });
-  for (const d of cutouts) {
-    g.append(el('path', { d, class: 'cutout', 'data-layer': 'cut' }));
+  const region = doorRegion(poly, holes, heartPoly);
+  const sideSign = side === 'left' ? 1 : -1;
+  if (style === 'floral') {
+    g.append(...floralDoorCutouts({ side: sideSign, inside: region, seed }));
+  } else if (style === 'mandala') {
+    g.append(...mandalaDoorCutouts({ side: sideSign, inside: region }));
+  } else {
+    const cutouts = generateLattice({
+      bbox: [x0, 0, x0 + GEO.doorW, GEO.H],
+      inside: region,
+      seed: seed + (side === 'left' ? 0 : 101),
+    });
+    for (const d of cutouts) {
+      g.append(el('path', { d, class: 'cutout', 'data-layer': 'cut' }));
+    }
   }
 
   for (const [hx, hy] of holes) {
@@ -445,6 +453,57 @@ function archPath(d, corner = 2.5) {
   );
 }
 
+/** Per-template vertical layout for the shared centre text stack. */
+const STACKS = {
+  arch: {
+    tag: 63, n1: 80, amp: 89.5, n2: 102.5, dSm: 121.5, dBig: 123, dots: 119.5,
+    dow: 131.5, div: 138.5, venue: 145.5, addr: 152, rsvp: 163.5, foot: 169.8, mw: 1,
+  },
+  botanical: {
+    tag: 63, n1: 80, amp: 89.5, n2: 102.5, dSm: 121.5, dBig: 123, dots: 119.5,
+    dow: 131.5, div: 138.5, venue: 145.5, addr: 152, rsvp: 163.5, foot: 169.8, mw: 0.86,
+  },
+  wave: {
+    tag: 57, n1: 74, amp: 83.5, n2: 96.5, dSm: 114.5, dBig: 116, dots: 112.5,
+    dow: 124.5, div: 131, venue: 138.5, addr: 145, rsvp: 156.5, foot: 163, mw: 0.92,
+  },
+};
+
+/** Tagline / names / oversized date / venue block shared by card templates. */
+function centerStack(g, s, L) {
+  const { cx } = ARCH;
+  const mw = L.mw;
+
+  g.append(textEl(s.tagline, cx, L.tag, { size: 4.6, ls: 1.1, maxW: 96 * mw }));
+
+  // Stacked script names - mixed typography trend.
+  g.append(textEl(s.name1, cx, L.n1, { font: 'script', size: 12.5, maxW: 100 * mw }));
+  g.append(textEl('&', cx, L.amp, { font: 'serifItalic', size: 6, maxW: 20 }));
+  g.append(textEl(s.name2, cx, L.n2, { font: 'script', size: 12.5, maxW: 100 * mw }));
+
+  // Oversized date row: MONTH  20  YEAR with dot separators.
+  g.append(textEl(s.month, cx - 26, L.dSm, { size: 5, ls: 1.2, maxW: 26 }));
+  g.append(textEl(s.dayNum, cx, L.dBig, { font: 'serifSemi', size: 13.5, maxW: 20 }));
+  g.append(textEl(s.year, cx + 26, L.dSm, { size: 5, ls: 1.2, maxW: 26 }));
+  for (const dx of [-13.5, 13.5]) {
+    g.append(
+      el('circle', { cx: cx + dx, cy: L.dots, r: 0.7, class: 'ink', 'data-layer': 'engrave' })
+    );
+  }
+
+  const dowTime = [s.dayOfWeek, s.time].filter(Boolean).join('  ·  ');
+  g.append(textEl(dowTime, cx, L.dow, { size: 4.4, ls: 0.8, maxW: 100 * mw }));
+
+  g.append(el('rect', barAttrs(cx - 7, L.div, 14, 0.4)));
+
+  g.append(textEl(s.venue, cx, L.venue, { size: 5.4, ls: 1, maxW: 104 * mw }));
+  s.addressLines.forEach((line, i) => {
+    g.append(textEl(line, cx, L.addr + i * 5.6, { size: 4.4, maxW: 104 * mw }));
+  });
+  g.append(textEl(s.rsvp, cx, L.rsvp, { size: 4.4, maxW: 98 * mw }));
+  g.append(textEl(s.footer, cx, L.foot, { size: 4, ls: 0.7, maxW: 98 * mw }));
+}
+
 function archGroup(s) {
   const { cx } = ARCH;
   const g = el('g', { id: 'arch-card' });
@@ -463,35 +522,99 @@ function archGroup(s) {
   if (motif) g.append(...motif);
   else g.append(...ornament(cx, 40));
 
-  g.append(textEl(s.tagline, cx, 63, { size: 4.6, ls: 1.1, maxW: 96 }));
+  centerStack(g, s, STACKS.arch);
+  return g;
+}
 
-  // Stacked script names - mixed typography trend.
-  g.append(textEl(s.name1, cx, 80, { font: 'script', size: 12.5, maxW: 100 }));
-  g.append(textEl('&', cx, 89.5, { font: 'serifItalic', size: 6, maxW: 20 }));
-  g.append(textEl(s.name2, cx, 102.5, { font: 'script', size: 12.5, maxW: 100 }));
+/** Arch card wrapped in a generative engraved botanical border. */
+function botanicalGroup(s) {
+  const { cx } = ARCH;
+  const g = el('g', { id: 'botanical-card' });
 
-  // Oversized date row: MONTH  20  YEAR with dot separators.
-  g.append(textEl(s.month, cx - 26, 121.5, { size: 5, ls: 1.2, maxW: 26 }));
-  g.append(textEl(s.dayNum, cx, 123, { font: 'serifSemi', size: 13.5, maxW: 20 }));
-  g.append(textEl(s.year, cx + 26, 121.5, { size: 5, ls: 1.2, maxW: 26 }));
-  for (const dx of [-13.5, 13.5]) {
-    g.append(
-      el('circle', { cx: cx + dx, cy: 119.5, r: 0.7, class: 'ink', 'data-layer': 'engrave' })
-    );
+  g.append(el('path', { d: archPath(0), class: 'board', 'data-layer': 'cut' }));
+  g.append(el('path', { d: archPath(4), class: 'ink-line', 'data-layer': 'engrave-line' }));
+
+  g.append(...buildBorderVine({ seed: s.seed }));
+
+  const motif = motifOrNull(s, { cx, top: 22, h: 30 });
+  if (motif) g.append(...motif);
+
+  centerStack(g, s, STACKS.botanical);
+  return g;
+}
+
+/* ------------------------------------------------------------------ */
+/* Wavy-edge template                                                  */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Rectangle with a sinusoidal die-cut edge; the wave fades out near the
+ * rounded corners so the outline stays smooth and snag-free.
+ */
+function wavyRectPath(inset, amp, wl = 15) {
+  const { W, H } = ARCH;
+  const c = 8; // corner radius
+  const xL = inset;
+  const xR = W - inset;
+  const yT = inset;
+  const yB = H - inset;
+  const pts = [];
+
+  const edge = (from, to, normal) => {
+    const len = Math.hypot(to[0] - from[0], to[1] - from[1]);
+    for (let d = 0; d <= len; d += 1.2) {
+      const taper = Math.min(1, d / 14, (len - d) / 14);
+      const w = amp * Math.sin((d / wl) * 2 * Math.PI) * taper;
+      const t = d / len;
+      pts.push([
+        from[0] + (to[0] - from[0]) * t + normal[0] * w,
+        from[1] + (to[1] - from[1]) * t + normal[1] * w,
+      ]);
+    }
+  };
+  const cornerArc = (centre, a0) => {
+    for (let i = 0; i <= 8; i++) {
+      const a = a0 + (i / 8) * (Math.PI / 2);
+      pts.push([centre[0] + c * Math.cos(a), centre[1] + c * Math.sin(a)]);
+    }
+  };
+
+  edge([xL + c, yT], [xR - c, yT], [0, -1]);
+  cornerArc([xR - c, yT + c], -Math.PI / 2);
+  edge([xR, yT + c], [xR, yB - c], [1, 0]);
+  cornerArc([xR - c, yB - c], 0);
+  edge([xR - c, yB], [xL + c, yB], [0, 1]);
+  cornerArc([xL + c, yB - c], Math.PI / 2);
+  edge([xL, yB - c], [xL, yT + c], [-1, 0]);
+  cornerArc([xL + c, yT + c], Math.PI);
+
+  return 'M ' + pts.map(fmtP).join(' L ') + ' Z';
+}
+
+function waveGroup(s) {
+  const { W, H, cx } = ARCH;
+  const g = el('g', { id: 'wave-card' });
+
+  g.append(el('path', { d: wavyRectPath(0, 1.8), class: 'board', 'data-layer': 'cut' }));
+  g.append(
+    el('path', { d: wavyRectPath(4.2, 1.2), class: 'ink-line', 'data-layer': 'engrave-line' })
+  );
+
+  // Botanical sprays in all four corners.
+  for (const [corner, dir] of [
+    [[0, 0], [1, 1]],
+    [[W, 0], [-1, 1]],
+    [[0, H], [1, -1]],
+    [[W, H], [-1, -1]],
+  ]) {
+    g.append(...buildCornerSpray({ corner, dir }));
   }
 
-  const dowTime = [s.dayOfWeek, s.time].filter(Boolean).join('  ·  ');
-  g.append(textEl(dowTime, cx, 131.5, { size: 4.4, ls: 0.8, maxW: 100 }));
+  const motif = motifOrNull(s, { cx, top: 14, h: 32 });
+  if (motif) g.append(...motif);
+  else g.append(...ornament(cx, 30));
 
-  g.append(el('rect', barAttrs(cx - 7, 138.5, 14, 0.4)));
-
-  g.append(textEl(s.venue, cx, 145.5, { size: 5.4, ls: 1, maxW: 104 }));
-  s.addressLines.forEach((line, i) => {
-    g.append(textEl(line, cx, 152 + i * 5.6, { size: 4.4, maxW: 104 }));
-  });
-  g.append(textEl(s.rsvp, cx, 163.5, { size: 4.4, maxW: 98 }));
-  g.append(textEl(s.footer, cx, 169.8, { size: 4, ls: 0.7, maxW: 98 }));
-
+  centerStack(g, s, STACKS.wave);
   return g;
 }
 
@@ -499,18 +622,25 @@ function archGroup(s) {
 /* Whole document                                                      */
 /* ------------------------------------------------------------------ */
 
+const CARD_TEMPLATES = {
+  arch: archGroup,
+  botanical: botanicalGroup,
+  wave: waveGroup,
+};
+
 function buildInvitationSVG(strings, opts) {
   const m = GEO.margin;
   const s = { ...strings, motif: opts.motif, seed: opts.seed };
 
-  if (opts.template === 'arch') {
+  const cardBuilder = CARD_TEMPLATES[opts.template];
+  if (cardBuilder) {
     const svg = el('svg', {
       xmlns: NS,
       viewBox: `${-m} ${-m} ${ARCH.W + 2 * m} ${ARCH.H + 2 * m}`,
       width: ARCH.W + 2 * m + 'mm',
       height: ARCH.H + 2 * m + 'mm',
     });
-    svg.append(archGroup(s));
+    svg.append(cardBuilder(s));
     return svg;
   }
 
@@ -526,9 +656,12 @@ function buildInvitationSVG(strings, opts) {
     height: h + 'mm',
   });
 
+  // The mandala fan radiates from the notch apex where the heart would sit,
+  // so the heart only applies to the other door styles.
+  const heart = opts.showHeart && opts.doorStyle !== 'mandala';
   if (opts.showDoors) {
-    svg.append(doorGroup('left', opts.seed, false));
-    svg.append(doorGroup('right', opts.seed, opts.showHeart));
+    svg.append(doorGroup('left', opts.seed, false, opts.doorStyle));
+    svg.append(doorGroup('right', opts.seed, heart, opts.doorStyle));
   }
   svg.append(panelGroup({ ...s, showDoors: opts.showDoors }));
   return svg;

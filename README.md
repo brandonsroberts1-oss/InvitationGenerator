@@ -1,15 +1,23 @@
 # Laser Wedding Invitation Generator
 
 A small web app that designs **laser-cut wedding invitations** and exports
-them as **laser-ready SVG**. Two templates are built in:
+them as **laser-ready SVG**. Four templates are built in, based on 2026
+stationery trends (sculptural die-cut shapes, hand-illustrated botanicals,
+mixed script/serif typography, oversized dates) and on the styles that sell
+on Etsy (floral frames, wavy die-cuts, mandala and lace gatefolds):
 
-- **Arch die-cut** *(default)* — a single 5×7″ card with a full-arch top,
-  fine double border, a swappable engraved graphic in the dome, stacked
-  script names and an oversized date row. Based on 2026 stationery trends
-  (sculptural die-cut shapes, hand-illustrated motifs, mixed script/serif
-  typography, oversized dates).
+- **Botanical arch** *(default)* — full-arch die-cut wrapped in a generative
+  engraved wildflower vine that climbs both sides and over the dome, with
+  leaves, five-petal flowers and berries. Every *Shuffle* grows a new vine.
+- **Arch die-cut** — the minimal version: fine double border, swappable
+  graphic in the dome, stacked script names, oversized date row.
+- **Wavy edge** — sinusoidal die-cut border (waves fade smoothly into the
+  rounded corners) with botanical sprays in all four corners.
 - **Gatefold lace doors** — a 5×7″ engraved centre panel flanked by two
-  generative lace doors with a decorative heart, joined with binding rings.
+  generative lace doors joined with binding rings, in three door styles:
+  **geometric crackle**, **floral vines** (engraved winding stems with leaf
+  and flower cutouts), and **mandala fan** (radial lace bursting from the
+  notch of each door — boho style).
 
 Type into the form and the invitation updates live. When you're happy,
 download the SVG and drop it straight into LightBurn, Glowforge, xTool
@@ -73,7 +81,8 @@ index.html        page & form
 css/style.css     UI styling + preview colours
 js/lattice.js     seeded RNG, Delaunay triangulation, lace generation
 js/template.js    invitation geometry & text layout (all sizes in mm)
-js/motifs.js      swappable engraved graphics (tree, wreath, cake, ...)
+js/motifs.js      swappable engraved graphics + border art (vine, sprays)
+js/doorstyles.js  gatefold door lace styles (floral vines, mandala fan)
 js/textpaths.js   text → outline tracing for export (opentype.js)
 js/app.js         state, live preview, export & download
 fonts/            Great Vibes + Playfair Display (SIL Open Font License)
