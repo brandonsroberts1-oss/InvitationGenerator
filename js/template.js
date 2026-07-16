@@ -217,14 +217,14 @@ function barAttrs(x, y, w, h = 0.5) {
 /* Text                                                                */
 /* ------------------------------------------------------------------ */
 
-function textEl(str, x, y, { font = 'serif', size = 5, ls = 0, maxW } = {}) {
+function textEl(str, x, y, { font = 'serif', size = 5, ls = 0, maxW, anchor = 'middle' } = {}) {
   const f = FONT_CSS[font];
   const attrs = {
     x,
     y,
     'font-size': size,
     'font-family': f.family,
-    'text-anchor': 'middle',
+    'text-anchor': anchor,
     class: 'ink',
     'data-layer': 'engrave',
     'data-font': font,
@@ -235,7 +235,7 @@ function textEl(str, x, y, { font = 'serif', size = 5, ls = 0, maxW } = {}) {
     attrs['letter-spacing'] = ls;
     // Browsers add letter-spacing after the last glyph too, which skews
     // text-anchor:middle by ls/2; nudge the preview back to true centre.
-    attrs.dx = ls / 2;
+    if (anchor === 'middle') attrs.dx = ls / 2;
   }
   if (maxW) attrs['data-maxw'] = maxW;
   const t = el('text', attrs);
@@ -288,7 +288,7 @@ function doorGroup(side, seed, withHeart, style = 'crackle') {
   if (style === 'floral') {
     g.append(...floralDoorCutouts({ side: sideSign, inside: region, seed }));
   } else if (style === 'mandala') {
-    g.append(...mandalaDoorCutouts({ side: sideSign, inside: region }));
+    g.append(...mandalaDoorCutouts({ side: sideSign, inside: region, seed }));
   } else {
     const cutouts = generateLattice({
       bbox: [x0, 0, x0 + GEO.doorW, GEO.H],
@@ -346,10 +346,21 @@ function doorGroup(side, seed, withHeart, style = 'crackle') {
 /**
  * Motif slot helper: returns the swappable graphic's nodes, or null when the
  * motif is 'none' (callers then draw their classic ornament instead).
+ *
+ * Full-card motifs (e.g. the grand oak) ignore the slot box; where a full
+ * rendition isn't allowed (the gatefold panel), they fall back to their
+ * slot-sized cousin so the dropdown always does something sensible.
  */
-function motifOrNull(s, box) {
-  if (!s.motif || s.motif === 'none') return null;
-  return motifNodes(s.motif, { ...box, seed: s.seed, initials: s.initials });
+function motifOrNull(s, box, opts = {}) {
+  const m = MOTIFS[s.motif];
+  if (!m || !m.build) return null;
+  if (m.full) {
+    if (!opts.allowFull) {
+      return MOTIFS.tree.build({ ...box, seed: s.seed });
+    }
+    return m.build({ cx: ARCH.cx, seed: s.seed, dy: opts.dy || 0 });
+  }
+  return m.build({ ...box, seed: s.seed, initials: s.initials });
 }
 
 function panelGroup(s) {
@@ -453,55 +464,135 @@ function archPath(d, corner = 2.5) {
   );
 }
 
-/** Per-template vertical layout for the shared centre text stack. */
-const STACKS = {
-  arch: {
-    tag: 63, n1: 80, amp: 89.5, n2: 102.5, dSm: 121.5, dBig: 123, dots: 119.5,
-    dow: 131.5, div: 138.5, venue: 145.5, addr: 152, rsvp: 163.5, foot: 169.8, mw: 1,
+/**
+ * Per-template tuning for the text layouts: dy shifts the whole stack
+ * (the wave card starts higher), mw scales max text widths (the botanical
+ * border eats into the sides), xL is the left margin for aligned layouts.
+ */
+const TUNE = {
+  arch: { dy: 0, mw: 1, xL: 17 },
+  botanical: { dy: 0, mw: 0.86, xL: 20 },
+  wave: { dy: -6.5, mw: 0.92, xL: 17 },
+};
+
+/** Oversized centred date row: MONTH  20  YEAR with dot separators. */
+function dateRow(g, s, y) {
+  const { cx } = ARCH;
+  g.append(textEl(s.month, cx - 26, y - 1.5, { size: 5, ls: 1.2, maxW: 26 }));
+  g.append(textEl(s.dayNum, cx, y, { font: 'serifSemi', size: 13.5, maxW: 20 }));
+  g.append(textEl(s.year, cx + 26, y - 1.5, { size: 5, ls: 1.2, maxW: 26 }));
+  for (const dx of [-13.5, 13.5]) {
+    g.append(
+      el('circle', { cx: cx + dx, cy: y - 3.5, r: 0.7, class: 'ink', 'data-layer': 'engrave' })
+    );
+  }
+}
+
+/** Centred venue / address / RSVP / footer block. */
+function detailsCentered(g, s, mw, ys) {
+  const { cx } = ARCH;
+  g.append(textEl(s.venue, cx, ys.venue, { size: 5.4, ls: 1, maxW: 104 * mw }));
+  s.addressLines.forEach((line, i) => {
+    g.append(textEl(line, cx, ys.addr + i * 5.6, { size: 4.4, maxW: 104 * mw }));
+  });
+  g.append(textEl(s.rsvp, cx, ys.rsvp, { size: 4.4, maxW: 98 * mw }));
+  g.append(textEl(s.footer, cx, ys.foot, { size: 4, ls: 0.7, maxW: 98 * mw }));
+}
+
+function joinParts(parts, sep) {
+  return parts.filter(Boolean).join(sep);
+}
+
+/**
+ * Text layouts for the card templates. Each is a distinct arrangement so
+ * the same template can produce visibly different invitations.
+ */
+const LAYOUTS = {
+  /** Stacked script names over an oversized boxed-free date row. */
+  classic(g, s, t) {
+    const { cx } = ARCH;
+    const d = t.dy;
+    const mw = t.mw;
+    g.append(textEl(s.tagline, cx, 63 + d, { size: 4.6, ls: 1.1, maxW: 96 * mw }));
+    g.append(textEl(s.name1, cx, 80 + d, { font: 'script', size: 12.5, maxW: 100 * mw }));
+    g.append(textEl('&', cx, 89.5 + d, { font: 'serifItalic', size: 6, maxW: 20 }));
+    g.append(textEl(s.name2, cx, 102.5 + d, { font: 'script', size: 12.5, maxW: 100 * mw }));
+    dateRow(g, s, 123 + d);
+    const dowTime = joinParts([s.dayOfWeek, s.time], '  ·  ');
+    g.append(textEl(dowTime, cx, 131.5 + d, { size: 4.4, ls: 0.8, maxW: 100 * mw }));
+    g.append(el('rect', barAttrs(cx - 7, 138.5 + d, 14, 0.4)));
+    detailsCentered(g, s, mw, {
+      venue: 145.5 + d, addr: 152 + d, rsvp: 163.5 + d, foot: 169.8 + d,
+    });
   },
-  botanical: {
-    tag: 63, n1: 80, amp: 89.5, n2: 102.5, dSm: 121.5, dBig: 123, dots: 119.5,
-    dow: 131.5, div: 138.5, venue: 145.5, addr: 152, rsvp: 163.5, foot: 169.8, mw: 0.86,
+
+  /** Left-aligned editorial style with generous whitespace. */
+  modern(g, s, t) {
+    const d = t.dy;
+    const x = t.xL;
+    const maxW = 127 - x - (t.mw < 1 ? 17 : 12);
+    const L = { anchor: 'start' };
+    g.append(textEl(s.tagline, x, 62 + d, { ...L, size: 4.4, ls: 1.2, maxW }));
+    g.append(textEl(s.name1, x, 81 + d, { ...L, font: 'script', size: 13.5, maxW }));
+    g.append(textEl('& ' + s.name2, x, 99 + d, { ...L, font: 'script', size: 13.5, maxW }));
+    g.append(el('rect', barAttrs(x, 108 + d, 22, 0.5)));
+    const dateLine = joinParts(
+      [s.dayOfWeek, joinParts([joinParts([s.month, s.dayNum], ' '), s.year], ', ')],
+      ', '
+    );
+    g.append(textEl(dateLine, x, 117 + d, { ...L, size: 4.8, ls: 0.8, maxW }));
+    g.append(textEl(s.time, x, 124 + d, { ...L, size: 4.4, ls: 0.8, maxW }));
+    g.append(textEl(s.venue, x, 137 + d, { ...L, size: 5.2, ls: 1, maxW }));
+    s.addressLines.forEach((line, i) => {
+      g.append(textEl(line, x, 143.5 + d + i * 5.6, { ...L, size: 4.4, maxW }));
+    });
+    g.append(textEl(s.rsvp, x, 156.5 + d, { ...L, size: 4.4, maxW }));
+    g.append(textEl(s.footer, x, 168.5 + d, { ...L, size: 3.9, ls: 0.8, maxW }));
   },
-  wave: {
-    tag: 57, n1: 74, amp: 83.5, n2: 96.5, dSm: 114.5, dBig: 116, dots: 112.5,
-    dow: 124.5, div: 131, venue: 138.5, addr: 145, rsvp: 156.5, foot: 163, mw: 0.92,
+
+  /** Names in large letterspaced serif caps - high-fashion editorial. */
+  editorial(g, s, t) {
+    const { cx } = ARCH;
+    const d = t.dy;
+    const mw = t.mw;
+    g.append(textEl(s.tagline, cx, 63 + d, { size: 4.4, ls: 1, maxW: 96 * mw }));
+    g.append(
+      textEl(s.name1.toUpperCase(), cx, 79 + d, { size: 8, ls: 2, maxW: 100 * mw })
+    );
+    g.append(textEl('&', cx, 90.5 + d, { font: 'script', size: 9.5, maxW: 20 }));
+    g.append(
+      textEl(s.name2.toUpperCase(), cx, 102 + d, { size: 8, ls: 2, maxW: 100 * mw })
+    );
+    dateRow(g, s, 123 + d);
+    const dowTime = joinParts([s.dayOfWeek, s.time], '  ·  ');
+    g.append(textEl(dowTime, cx, 131.5 + d, { size: 4.4, ls: 0.8, maxW: 100 * mw }));
+    g.append(el('rect', barAttrs(cx - 7, 138.5 + d, 14, 0.4)));
+    detailsCentered(g, s, mw, {
+      venue: 145.5 + d, addr: 152 + d, rsvp: 163.5 + d, foot: 169.8 + d,
+    });
+  },
+
+  /** Giant script monogram up top (replaces the graphic), names on one line. */
+  crest(g, s, t) {
+    const { cx } = ARCH;
+    const d = t.dy;
+    const mw = t.mw;
+    g.append(textEl(s.initials, cx, 46 + d, { font: 'script', size: 16, maxW: 64 }));
+    g.append(...ornament(cx, 54 + d));
+    g.append(textEl(s.tagline, cx, 64 + d, { size: 4.4, ls: 1, maxW: 96 * mw }));
+    g.append(textEl(s.names, cx, 82 + d, { font: 'script', size: 10.5, maxW: 104 * mw }));
+    dateRow(g, s, 105 + d);
+    const dowTime = joinParts([s.dayOfWeek, s.time], '  ·  ');
+    g.append(textEl(dowTime, cx, 113.5 + d, { size: 4.4, ls: 0.8, maxW: 100 * mw }));
+    g.append(el('rect', barAttrs(cx - 7, 120.5 + d, 14, 0.4)));
+    detailsCentered(g, s, mw, {
+      venue: 133 + d, addr: 139.5 + d, rsvp: 155.5 + d, foot: 165 + d,
+    });
   },
 };
 
-/** Tagline / names / oversized date / venue block shared by card templates. */
-function centerStack(g, s, L) {
-  const { cx } = ARCH;
-  const mw = L.mw;
-
-  g.append(textEl(s.tagline, cx, L.tag, { size: 4.6, ls: 1.1, maxW: 96 * mw }));
-
-  // Stacked script names - mixed typography trend.
-  g.append(textEl(s.name1, cx, L.n1, { font: 'script', size: 12.5, maxW: 100 * mw }));
-  g.append(textEl('&', cx, L.amp, { font: 'serifItalic', size: 6, maxW: 20 }));
-  g.append(textEl(s.name2, cx, L.n2, { font: 'script', size: 12.5, maxW: 100 * mw }));
-
-  // Oversized date row: MONTH  20  YEAR with dot separators.
-  g.append(textEl(s.month, cx - 26, L.dSm, { size: 5, ls: 1.2, maxW: 26 }));
-  g.append(textEl(s.dayNum, cx, L.dBig, { font: 'serifSemi', size: 13.5, maxW: 20 }));
-  g.append(textEl(s.year, cx + 26, L.dSm, { size: 5, ls: 1.2, maxW: 26 }));
-  for (const dx of [-13.5, 13.5]) {
-    g.append(
-      el('circle', { cx: cx + dx, cy: L.dots, r: 0.7, class: 'ink', 'data-layer': 'engrave' })
-    );
-  }
-
-  const dowTime = [s.dayOfWeek, s.time].filter(Boolean).join('  ·  ');
-  g.append(textEl(dowTime, cx, L.dow, { size: 4.4, ls: 0.8, maxW: 100 * mw }));
-
-  g.append(el('rect', barAttrs(cx - 7, L.div, 14, 0.4)));
-
-  g.append(textEl(s.venue, cx, L.venue, { size: 5.4, ls: 1, maxW: 104 * mw }));
-  s.addressLines.forEach((line, i) => {
-    g.append(textEl(line, cx, L.addr + i * 5.6, { size: 4.4, maxW: 104 * mw }));
-  });
-  g.append(textEl(s.rsvp, cx, L.rsvp, { size: 4.4, maxW: 98 * mw }));
-  g.append(textEl(s.footer, cx, L.foot, { size: 4, ls: 0.7, maxW: 98 * mw }));
+function renderLayout(g, s, t) {
+  (LAYOUTS[s.layout] || LAYOUTS.classic)(g, s, t);
 }
 
 function archGroup(s) {
@@ -517,12 +608,14 @@ function archGroup(s) {
     );
   }
 
-  // Swappable graphic inside the dome.
-  const motif = motifOrNull(s, { cx, top: 20, h: 34 });
-  if (motif) g.append(...motif);
-  else g.append(...ornament(cx, 40));
+  // Swappable graphic inside the dome (the crest layout brings its own).
+  if (s.layout !== 'crest') {
+    const motif = motifOrNull(s, { cx, top: 20, h: 34 }, { allowFull: true, dy: TUNE.arch.dy });
+    if (motif) g.append(...motif);
+    else g.append(...ornament(cx, 40));
+  }
 
-  centerStack(g, s, STACKS.arch);
+  renderLayout(g, s, TUNE.arch);
   return g;
 }
 
@@ -536,10 +629,12 @@ function botanicalGroup(s) {
 
   g.append(...buildBorderVine({ seed: s.seed }));
 
-  const motif = motifOrNull(s, { cx, top: 22, h: 30 });
-  if (motif) g.append(...motif);
+  if (s.layout !== 'crest') {
+    const motif = motifOrNull(s, { cx, top: 22, h: 30 }, { allowFull: true, dy: TUNE.botanical.dy });
+    if (motif) g.append(...motif);
+  }
 
-  centerStack(g, s, STACKS.botanical);
+  renderLayout(g, s, TUNE.botanical);
   return g;
 }
 
@@ -595,26 +690,30 @@ function waveGroup(s) {
   const { W, H, cx } = ARCH;
   const g = el('g', { id: 'wave-card' });
 
-  g.append(el('path', { d: wavyRectPath(0, 1.8), class: 'board', 'data-layer': 'cut' }));
+  // Seed the wavelength so every shuffled card has its own edge.
+  const wl = 13.5 + mulberry32((s.seed + 9) >>> 0)() * 3.5;
+  g.append(el('path', { d: wavyRectPath(0, 1.8, wl), class: 'board', 'data-layer': 'cut' }));
   g.append(
-    el('path', { d: wavyRectPath(4.2, 1.2), class: 'ink-line', 'data-layer': 'engrave-line' })
+    el('path', { d: wavyRectPath(4.2, 1.2, wl), class: 'ink-line', 'data-layer': 'engrave-line' })
   );
 
-  // Botanical sprays in all four corners.
-  for (const [corner, dir] of [
+  // Botanical sprays in all four corners, each grown from the seed.
+  [
     [[0, 0], [1, 1]],
     [[W, 0], [-1, 1]],
     [[0, H], [1, -1]],
     [[W, H], [-1, -1]],
-  ]) {
-    g.append(...buildCornerSpray({ corner, dir }));
+  ].forEach(([corner, dir], i) => {
+    g.append(...buildCornerSpray({ corner, dir, seed: s.seed + i * 17 }));
+  });
+
+  if (s.layout !== 'crest') {
+    const motif = motifOrNull(s, { cx, top: 14, h: 32 }, { allowFull: true, dy: TUNE.wave.dy });
+    if (motif) g.append(...motif);
+    else g.append(...ornament(cx, 30));
   }
 
-  const motif = motifOrNull(s, { cx, top: 14, h: 32 });
-  if (motif) g.append(...motif);
-  else g.append(...ornament(cx, 30));
-
-  centerStack(g, s, STACKS.wave);
+  renderLayout(g, s, TUNE.wave);
   return g;
 }
 
@@ -632,6 +731,7 @@ function buildInvitationSVG(strings, opts) {
   const m = GEO.margin;
   const s = { ...strings, motif: opts.motif, seed: opts.seed };
 
+  s.layout = opts.layout || 'classic';
   const cardBuilder = CARD_TEMPLATES[opts.template];
   if (cardBuilder) {
     const svg = el('svg', {

@@ -22,6 +22,7 @@ const state = {
   footer: 'Dinner & Dancing to Follow',
   template: 'botanical',
   motif: 'none',
+  layout: 'classic',
   doorStyle: 'crackle',
   showDoors: true,
   showHeart: true,
@@ -63,6 +64,7 @@ function render() {
   const svg = buildInvitationSVG(displayStrings(), {
     template: state.template,
     motif: state.motif,
+    layout: state.layout,
     doorStyle: state.doorStyle,
     showDoors: state.showDoors,
     showHeart: state.showHeart,
@@ -173,7 +175,7 @@ function bind() {
   for (const [id, m] of Object.entries(MOTIFS)) {
     motifSel.append(new Option(m.label, id));
   }
-  for (const k of ['template', 'motif', 'doorStyle']) {
+  for (const k of ['template', 'motif', 'layout', 'doorStyle']) {
     const sel = document.getElementById(k);
     sel.value = state[k];
     sel.addEventListener('change', () => {

@@ -85,7 +85,8 @@ label {
   color: var(--muted);
 }
 
-body[data-template='arch'] .only-gatefold { display: none; }
+body:not([data-template='gatefold']) .only-gatefold { display: none; }
+body[data-template='gatefold'] .only-card { display: none; }
 
 input[type='text'],
 select,

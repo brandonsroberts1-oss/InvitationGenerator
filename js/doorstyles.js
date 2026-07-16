@@ -121,8 +121,12 @@ function floralDoorCutouts({ side, inside, seed }) {
 /* Mandala fan: radial lace bursting from the notch apex               */
 /* ------------------------------------------------------------------ */
 
-function mandalaDoorCutouts({ side, inside }) {
+function mandalaDoorCutouts({ side, inside, seed = 1 }) {
   const map = doorMapper(side);
+  // Same seed for both doors, and the code path below is deterministic per
+  // door, so the two doors always come out as mirror images.
+  const rng = mulberry32(((seed * 419 + 23) >>> 0) || 17);
+  const j = () => (rng() - 0.5) * 2;
   const nodes = [];
 
   const fan = (c, a0, a1, rings) => {
@@ -141,14 +145,15 @@ function mandalaDoorCutouts({ side, inside }) {
     }
   };
 
-  // Big half-mandala centred on the notch apex, opening into the door.
+  // Big half-mandala centred on the notch apex, opening into the door;
+  // ring sizes and counts vary with the seed for one-of-a-kind lace.
   fan([17, 89], -72, 72, [
-    { type: 'petal', r: 9, n: 7, len: 6.5, wid: 2.4 },
-    { type: 'dot', r: 17, n: 9, dr: 1.1 },
-    { type: 'petal', r: 20.5, n: 9, len: 8.5, wid: 3 },
-    { type: 'dot', r: 31, n: 11, dr: 1.2 },
-    { type: 'petal', r: 34, n: 9, len: 10, wid: 3.4 },
-    { type: 'dot', r: 46.5, n: 13, dr: 1.1 },
+    { type: 'petal', r: 9 + j(), n: 7 + Math.floor(rng() * 2), len: 6 + rng(), wid: 2.4 },
+    { type: 'dot', r: 17 + j(), n: 9, dr: 1.1 },
+    { type: 'petal', r: 20.5 + j(), n: 9 + Math.floor(rng() * 2), len: 8 + rng() * 1.5, wid: 3 },
+    { type: 'dot', r: 31 + j(), n: 11, dr: 1.2 },
+    { type: 'petal', r: 34 + j(), n: 9 + Math.floor(rng() * 3), len: 9.5 + rng() * 1.5, wid: 3.4 },
+    { type: 'dot', r: 46.5 + j(), n: 13, dr: 1.1 },
   ]);
 
   // Small quarter-fans in the outer corners.

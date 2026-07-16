@@ -27,9 +27,19 @@ Creative Space, Inkscape, etc.
 
 - **Live editable fields** – tagline, names, date block, venue, address,
   RSVP and footer lines. Text that gets too long shrinks automatically to fit.
-- **Swappable graphics** – choose the engraved motif: old romantic tree
-  (generative — every shuffle grows a new one), laurel wreath with the
-  couple's initials, tiered wedding cake, mountain range, or wedding rings.
+- **Text layouts** – four distinct arrangements for the card templates so the
+  same design never looks like anyone else's: *Classic* (stacked script
+  names), *Modern* (left-aligned editorial), *Editorial* (letterspaced serif
+  caps), and *Monogram crest* (giant script initials up top).
+- **Swappable graphics** – choose the engraved motif: old romantic tree,
+  **grand oak** (a full-card version whose canopy fills the top and whose
+  blossoms drift down the margins), laurel wreath with the couple's
+  initials, tiered wedding cake, mountain range, or wedding rings.
+- **One-of-a-kind by construction** – nearly everything is seeded-generative:
+  both trees, the botanical border vine, the corner sprays, the wavy edge's
+  wavelength, the crackle/floral/mandala door lace, the mountain range, the
+  rings and the wreath all reshuffle together, so every *Shuffle* click is a
+  design nobody else will ever receive.
 - **Generative lace doors** (gatefold) – the crackle lattice is generated from
   a seeded Delaunay triangulation; hit *Shuffle* until you like it. Every
   cutout keeps a minimum 2.2 mm web so the piece stays strong.

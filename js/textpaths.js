@@ -39,16 +39,19 @@ function ensureFonts() {
 }
 
 /**
- * Path data for `text` with its horizontal centre at x and baseline at y.
+ * Path data for `text` anchored at x (per `anchor`) with baseline at y.
  * Letter-spacing (ls, in mm) matches the preview's letter-spacing attribute.
  */
-function textToPathD(font, text, x, y, size, ls = 0) {
+function textToPathD(font, text, x, y, size, ls = 0, anchor = 'middle') {
   if (!text) return '';
+
+  const anchored = (width) =>
+    anchor === 'start' ? x : anchor === 'end' ? x - width : x - width / 2;
 
   if (!ls) {
     const width = font.getAdvanceWidth(text, size, { kerning: true });
     return font
-      .getPath(text, x - width / 2, y, size, { kerning: true })
+      .getPath(text, anchored(width), y, size, { kerning: true })
       .toPathData(3);
   }
 
@@ -57,7 +60,7 @@ function textToPathD(font, text, x, y, size, ls = 0) {
   let width = ls * (chars.length - 1);
   for (const ch of chars) width += font.getAdvanceWidth(ch, size);
 
-  let cursor = x - width / 2;
+  let cursor = anchored(width);
   let d = '';
   for (const ch of chars) {
     d += font.getPath(ch, cursor, y, size).toPathData(3);
@@ -77,7 +80,8 @@ async function convertTextsToPaths(svgRoot) {
       parseFloat(t.getAttribute('x')),
       parseFloat(t.getAttribute('y')),
       parseFloat(t.getAttribute('font-size')),
-      parseFloat(t.getAttribute('letter-spacing') || 0)
+      parseFloat(t.getAttribute('letter-spacing') || 0),
+      t.getAttribute('text-anchor') || 'middle'
     );
     if (d) {
       const p = document.createElementNS(NS, 'path');

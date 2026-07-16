@@ -40,6 +40,28 @@ function inkDot([x, y], r) {
 /* Old romantic tree - generative branching oak                        */
 /* ------------------------------------------------------------------ */
 
+/**
+ * One tapered, gently curved branch segment as a closed filled shape.
+ * Returns the path data (through `map`), the tip, and the outgoing angle.
+ */
+function taperedBranch(map, rng, x, y, ang, len, w) {
+  const ex = x + Math.cos(ang) * len;
+  const ey = y + Math.sin(ang) * len;
+  const we = Math.max(w * 0.62, 0.5);
+  const px = -Math.sin(ang);
+  const py = Math.cos(ang);
+  const bend = (rng() - 0.5) * len * 0.35;
+  const mx = (x + ex) / 2 + px * bend;
+  const my = (y + ey) / 2 + py * bend;
+  const cw = (w + we) / 4;
+  const d =
+    `M ${fmtP(map([x + (px * w) / 2, y + (py * w) / 2]))} ` +
+    `Q ${fmtP(map([mx + px * cw, my + py * cw]))} ${fmtP(map([ex + (px * we) / 2, ey + (py * we) / 2]))} ` +
+    `L ${fmtP(map([ex - (px * we) / 2, ey - (py * we) / 2]))} ` +
+    `Q ${fmtP(map([mx - px * cw, my - py * cw]))} ${fmtP(map([x - (px * w) / 2, y - (py * w) / 2]))} Z`;
+  return { d, ex, ey, outAng: Math.atan2(ey - my, ex - mx) };
+}
+
 function buildTree({ cx, top, h, seed = 1 }) {
   const k = h / 100;
   const P = motifMapper(cx, top, h);
@@ -48,23 +70,10 @@ function buildTree({ cx, top, h, seed = 1 }) {
   const leaves = [];
 
   function branch(x, y, ang, len, w, depth) {
-    const ex = x + Math.cos(ang) * len;
-    const ey = y + Math.sin(ang) * len;
-    const we = Math.max(w * 0.62, 0.8);
-    const px = -Math.sin(ang);
-    const py = Math.cos(ang);
-    const bend = (rng() - 0.5) * len * 0.35;
-    const mx = (x + ex) / 2 + px * bend;
-    const my = (y + ey) / 2 + py * bend;
-
-    // Tapered, gently curved branch as a closed filled shape.
-    const cw = (w + we) / 4;
-    const d =
-      `M ${fmtP(P([x + (px * w) / 2, y + (py * w) / 2]))} ` +
-      `Q ${fmtP(P([mx + px * cw, my + py * cw]))} ${fmtP(P([ex + (px * we) / 2, ey + (py * we) / 2]))} ` +
-      `L ${fmtP(P([ex - (px * we) / 2, ey - (py * we) / 2]))} ` +
-      `Q ${fmtP(P([mx - px * cw, my - py * cw]))} ${fmtP(P([x - (px * w) / 2, y - (py * w) / 2]))} Z`;
-    nodes.push(inkPath(d));
+    const b = taperedBranch(P, rng, x, y, ang, len, w);
+    nodes.push(inkPath(b.d));
+    const ex = b.ex;
+    const ey = b.ey;
 
     if (depth >= 4 || w * 0.55 < 1.1) {
       // Blossom cluster at the twig tip.
@@ -92,11 +101,10 @@ function buildTree({ cx, top, h, seed = 1 }) {
       return;
     }
 
-    const outAng = Math.atan2(ey - my, ex - mx);
     const nC = depth === 1 ? 3 : rng() < 0.5 ? 3 : 2;
     for (let i = 0; i < nC; i++) {
       const spread = (i - (nC - 1) / 2) * (0.42 + rng() * 0.18) + (rng() - 0.5) * 0.18;
-      branch(ex, ey, outAng + spread, len * (0.62 + rng() * 0.12), w * 0.55, depth + 1);
+      branch(ex, ey, b.outAng + spread, len * (0.62 + rng() * 0.12), w * 0.55, depth + 1);
     }
   }
 
@@ -113,12 +121,79 @@ function buildTree({ cx, top, h, seed = 1 }) {
   return nodes;
 }
 
+/**
+ * Grand oak: a full-card version of the romantic tree. The canopy fills the
+ * top of the card above the text and loose blossoms drift down both side
+ * margins. Works in world millimetres directly (no slot box).
+ */
+function buildGrandTree({ cx, seed = 1, dy = 0 }) {
+  const id = (p) => p;
+  const rng = mulberry32(((seed * 48271 + 7) >>> 0) || 5);
+  const nodes = [];
+  const leaves = [];
+  const baseY = 56.5 + dy;
+
+  function branch(x, y, ang, len, w, depth) {
+    const b = taperedBranch(id, rng, x, y, ang, len, w);
+    nodes.push(inkPath(b.d));
+
+    if (depth >= 4 || w * 0.55 < 0.55) {
+      const n = 3 + Math.floor(rng() * 3);
+      for (let i = 0; i < n; i++) {
+        const la = rng() * Math.PI * 2;
+        const lr = rng() * 2.6;
+        leaves.push([b.ex + Math.cos(la) * lr, b.ey + Math.sin(la) * lr, 0.5 + rng() * 0.55]);
+      }
+      return;
+    }
+
+    if (depth === 0) {
+      // Wide symmetric fan so the canopy spans the card.
+      for (const base of [-1.2, -0.6, 0, 0.6, 1.2]) {
+        branch(
+          b.ex, b.ey,
+          -Math.PI / 2 + base + (rng() - 0.5) * 0.12,
+          len * (0.95 + rng() * 0.15),
+          w * 0.5,
+          1
+        );
+      }
+      return;
+    }
+
+    const nC = depth === 1 ? 3 : rng() < 0.5 ? 3 : 2;
+    for (let i = 0; i < nC; i++) {
+      const spread = (i - (nC - 1) / 2) * (0.5 + rng() * 0.22) + (rng() - 0.5) * 0.2;
+      branch(b.ex, b.ey, b.outAng + spread, len * (0.68 + rng() * 0.12), w * 0.55, depth + 1);
+    }
+  }
+
+  branch(cx, baseY, -Math.PI / 2 + (rng() - 0.5) * 0.06, 15, 5, 0);
+
+  for (const [lx, ly, lr] of leaves) {
+    nodes.push(inkDot([lx, ly], Math.max(0.35, lr)));
+  }
+
+  // Blossoms drifting down the side margins, clear of the text block.
+  for (const [x0, x1] of [[6, 13], [114, 121]]) {
+    const n = 8 + Math.floor(rng() * 4);
+    for (let i = 0; i < n; i++) {
+      nodes.push(
+        inkDot([x0 + rng() * (x1 - x0), 66 + dy + rng() * 60], 0.4 + rng() * 0.5)
+      );
+    }
+  }
+
+  return nodes;
+}
+
 /* ------------------------------------------------------------------ */
 /* Laurel wreath with the couple's initials                            */
 /* ------------------------------------------------------------------ */
 
-function buildWreath({ cx, top, h, initials = '' }) {
+function buildWreath({ cx, top, h, initials = '', seed = 1 }) {
   const k = h / 100;
+  const rng = mulberry32(((seed * 31 + 5) >>> 0) || 3);
   const nodes = [];
   const C = [50, 51];
   const R = 35;
@@ -146,10 +221,12 @@ function buildWreath({ cx, top, h, initials = '' }) {
     for (let a = 100; a <= 226; a += 14, i++) {
       const t = (a * Math.PI) / 180;
       const base = [C[0] + R * Math.cos(t), C[1] + R * Math.sin(t)];
-      const ang = t + Math.PI / 2 + (i % 2 ? 0.62 : -0.62);
+      const ang = t + Math.PI / 2 + (i % 2 ? 1 : -1) * (0.5 + rng() * 0.3);
       const place = rotateAbout(base, ang);
       nodes.push(
-        inkPath(segsToPath(transformSegs(petalSegs(8.5, 2.4), (p) => W(place(p)))))
+        inkPath(
+          segsToPath(transformSegs(petalSegs(7.6 + rng() * 1.8, 2.4), (p) => W(place(p))))
+        )
       );
       if (i % 3 === 1) {
         const off = i % 2 ? 5.5 : -5.5;
@@ -175,9 +252,11 @@ function buildWreath({ cx, top, h, initials = '' }) {
 /* Tiered wedding cake                                                 */
 /* ------------------------------------------------------------------ */
 
-function buildCake({ cx, top, h }) {
+function buildCake({ cx, top, h, seed = 1 }) {
   const k = h / 100;
   const P = motifMapper(cx, top, h);
+  const rng = mulberry32(((seed * 613 + 41) >>> 0) || 13);
+  const scallopDepth = 4 + rng() * 1.4;
   const nodes = [];
 
   const rect = (u, v, w, ht) =>
@@ -204,7 +283,7 @@ function buildCake({ cx, top, h }) {
     const n = Math.round((x1 - x0) / 6);
     const step = (x1 - x0) / n;
     for (let i = 0; i < n; i++) {
-      d += ` Q ${fmtP(P([x0 + step * (i + 0.5), y + 4.6]))} ${fmtP(P([x0 + step * (i + 1), y]))}`;
+      d += ` Q ${fmtP(P([x0 + step * (i + 0.5), y + scallopDepth]))} ${fmtP(P([x0 + step * (i + 1), y]))}`;
     }
     nodes.push(linePath(d));
   }
@@ -240,61 +319,66 @@ function buildCake({ cx, top, h }) {
 /* Mountain range                                                      */
 /* ------------------------------------------------------------------ */
 
-function buildMountains({ cx, top, h }) {
+function buildMountains({ cx, top, h, seed = 1 }) {
   const k = h / 100;
   const P = motifMapper(cx, top, h);
+  const rng = mulberry32(((seed * 131 + 17) >>> 0) || 7);
   const nodes = [];
 
   // Baseline.
   nodes.push(linePath(`M ${fmtP(P([12, 80]))} L ${fmtP(P([88, 80]))}`));
 
-  // Two overlapping peaks.
+  // Two overlapping peaks, reshaped by the seed.
+  const aX = 42 + rng() * 7;
+  const aY = 28 + rng() * 7;
+  const bX = 66 + rng() * 7;
+  const bY = 42 + rng() * 7;
   nodes.push(
-    linePath(`M ${fmtP(P([16, 80]))} L ${fmtP(P([45, 32]))} L ${fmtP(P([74, 80]))}`)
+    linePath(`M ${fmtP(P([16, 80]))} L ${fmtP(P([aX, aY]))} L ${fmtP(P([aX + 29, 80]))}`)
   );
   nodes.push(
-    linePath(`M ${fmtP(P([50, 80]))} L ${fmtP(P([72, 46]))} L ${fmtP(P([90, 80]))}`)
+    linePath(`M ${fmtP(P([bX - 22, 80]))} L ${fmtP(P([bX, bY]))} L ${fmtP(P([bX + 18, 80]))}`)
   );
 
-  // Snow lines.
+  // Snow zigzags hung below each summit.
   nodes.push(
     linePath(
-      `M ${fmtP(P([39, 42]))} L ${fmtP(P([43, 46]))} L ${fmtP(P([46, 42]))} ` +
-        `L ${fmtP(P([49, 46]))} L ${fmtP(P([52, 42]))}`
+      `M ${fmtP(P([aX - 6, aY + 10]))} L ${fmtP(P([aX - 2, aY + 14]))} L ${fmtP(P([aX + 1, aY + 10]))} ` +
+        `L ${fmtP(P([aX + 4, aY + 14]))} L ${fmtP(P([aX + 7, aY + 10]))}`
     )
   );
   nodes.push(
-    linePath(`M ${fmtP(P([67, 54]))} L ${fmtP(P([70, 57]))} L ${fmtP(P([73, 54]))}`)
+    linePath(
+      `M ${fmtP(P([bX - 3, bY + 8]))} L ${fmtP(P([bX, bY + 11]))} L ${fmtP(P([bX + 3, bY + 8]))}`
+    )
   );
 
-  // Sun and birds.
+  // Sun tucked beside the big peak, plus a couple of birds.
   nodes.push(
     el('circle', {
-      cx: round2(cx + (27 - 50) * k),
-      cy: round2(top + 34 * k),
+      cx: round2(cx + (aX - 18 - 50) * k),
+      cy: round2(top + (aY + 4) * k),
       r: round2(7.5 * k),
       class: 'ink-line',
       'data-layer': 'engrave-line',
     })
   );
-  for (const [bx, by, s] of [
-    [60, 24, 1],
-    [69, 19, 0.75],
-  ]) {
+  const nBirds = 2 + Math.floor(rng() * 2);
+  for (let i = 0; i < nBirds; i++) {
+    const bxr = 55 + rng() * 14;
+    const byr = 16 + rng() * 10;
+    const s = 0.65 + rng() * 0.4;
     nodes.push(
       linePath(
-        `M ${fmtP(P([bx - 4 * s, by]))} Q ${fmtP(P([bx - 2 * s, by - 3 * s]))} ${fmtP(P([bx, by]))} ` +
-          `Q ${fmtP(P([bx + 2 * s, by - 3 * s]))} ${fmtP(P([bx + 4 * s, by]))}`
+        `M ${fmtP(P([bxr - 4 * s, byr]))} Q ${fmtP(P([bxr - 2 * s, byr - 3 * s]))} ${fmtP(P([bxr, byr]))} ` +
+          `Q ${fmtP(P([bxr + 2 * s, byr - 3 * s]))} ${fmtP(P([bxr + 4 * s, byr]))}`
       )
     );
   }
 
   // Little pines at the foothills.
-  for (const [px, ph] of [
-    [21, 10],
-    [28, 7.5],
-    [82, 9],
-  ]) {
+  for (const px of [19 + rng() * 5, 27 + rng() * 5, 79 + rng() * 5]) {
+    const ph = 7 + rng() * 4;
     nodes.push(
       inkPath(
         `M ${fmtP(P([px - 3.2, 80]))} L ${fmtP(P([px, 80 - ph]))} L ${fmtP(P([px + 3.2, 80]))} Z`
@@ -308,14 +392,15 @@ function buildMountains({ cx, top, h }) {
 /* Interlocked wedding rings                                           */
 /* ------------------------------------------------------------------ */
 
-function buildRings({ cx, top, h }) {
+function buildRings({ cx, top, h, seed = 1 }) {
   const k = h / 100;
   const P = motifMapper(cx, top, h);
+  const rng = mulberry32(((seed * 977 + 29) >>> 0) || 11);
   const nodes = [];
 
   for (const [u, v] of [
-    [42, 56],
-    [60, 50],
+    [41 + rng() * 3, 55 + rng() * 3],
+    [59 + rng() * 3, 48 + rng() * 3],
   ]) {
     const c = P([u, v]);
     nodes.push(
@@ -337,8 +422,8 @@ function buildRings({ cx, top, h }) {
     )
   );
   for (const [sx, sy, s] of [
-    [73, 24, 1],
-    [30, 32, 0.7],
+    [70 + rng() * 6, 21 + rng() * 6, 1],
+    [27 + rng() * 6, 29 + rng() * 6, 0.7],
   ]) {
     nodes.push(linePath(`M ${fmtP(P([sx, sy - 3.5 * s]))} L ${fmtP(P([sx, sy + 3.5 * s]))}`));
     nodes.push(linePath(`M ${fmtP(P([sx - 3.5 * s, sy]))} L ${fmtP(P([sx + 3.5 * s, sy]))}`));
@@ -455,19 +540,21 @@ function buildBorderVine({ seed = 1 }) {
  * Small botanical spray tucked into a corner of the wavy card.
  * corner = world corner point, dir = [+-1, +-1] pointing into the card.
  */
-function buildCornerSpray({ corner, dir }) {
+function buildCornerSpray({ corner, dir, seed = 1 }) {
   const M = (p) => [corner[0] + p[0] * dir[0], corner[1] + p[1] * dir[1]];
+  const rng = mulberry32(((seed * 197 + 3) >>> 0) || 19);
   const nodes = [];
 
   // Curved stem.
   const P0 = [5.5, 9.5];
-  const C = [13, 10.5];
-  const P1 = [19.5, 18.5];
+  const C = [13, 10.5 + (rng() - 0.5) * 3];
+  const P1 = [19.5 + rng() * 2, 18.5 + rng() * 2];
   nodes.push(linePath(`M ${fmtP(M(P0))} Q ${fmtP(M(C))} ${fmtP(M(P1))}`));
 
   // Leaves fanned along the stem.
   let flip = 1;
-  for (const t of [0.15, 0.45, 0.75]) {
+  for (const tBase of [0.15, 0.45, 0.75]) {
+    const t = tBase + (rng() - 0.5) * 0.1;
     const u = 1 - t;
     const q = [
       u * u * P0[0] + 2 * u * t * C[0] + t * t * P1[0],
@@ -477,8 +564,10 @@ function buildCornerSpray({ corner, dir }) {
     const ty = 2 * u * (C[1] - P0[1]) + 2 * t * (P1[1] - C[1]);
     const th = Math.atan2(ty, tx);
     flip = -flip;
-    const place = rotateAbout(q, th + flip * 0.85);
-    nodes.push(inkPath(segsToPath(transformSegs(petalSegs(5.6, 2), (p) => M(place(p))))));
+    const place = rotateAbout(q, th + flip * (0.7 + rng() * 0.3));
+    nodes.push(
+      inkPath(segsToPath(transformSegs(petalSegs(5 + rng() * 1.4, 2), (p) => M(place(p)))))
+    );
   }
 
   nodes.push(inkDot(M([21.5, 20.5]), 1));
@@ -492,6 +581,7 @@ function buildCornerSpray({ corner, dir }) {
 const MOTIFS = {
   none: { label: 'None (classic ornament)', build: null },
   tree: { label: 'Old romantic tree', build: buildTree },
+  grandtree: { label: 'Grand oak — full card', build: buildGrandTree, full: true },
   wreath: { label: 'Laurel wreath & initials', build: buildWreath },
   cake: { label: 'Wedding cake', build: buildCake },
   mountains: { label: 'Mountain range', build: buildMountains },
