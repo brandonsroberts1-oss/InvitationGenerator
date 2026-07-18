@@ -117,6 +117,19 @@
     </section>
 
     <section>
+      <h2>Listing photos</h2>
+      <label>Wood tone
+        <select id="woodTone"></select>
+      </label>
+      <label>Brand line (optional)
+        <input id="brand" type="text" placeholder="YourShopName">
+      </label>
+      <button id="listing-mode" type="button" class="primary">&#128247; Generate listing photos</button>
+      <p id="listing-status" class="hint status"></p>
+      <p class="hint">Five Etsy-ready 2400&times;1800 PNGs: hero shot, one-of-a-kind grid, wood tones, styles, engraving close-up &mdash; built from your current design.</p>
+    </section>
+
+    <section>
       <h2>Export</h2>
       <button id="export-laser" type="button" class="primary">Download laser-ready SVG</button>
       <p class="hint">Text traced to outlines &middot; <span class="swatch red"></span> red = cut &middot; <span class="swatch black"></span> black = engrave &middot; real mm units</p>
@@ -127,6 +140,7 @@
 
   <main id="stage">
     <div id="preview"></div>
+    <div id="gallery" hidden></div>
   </main>
 
   <script src="vendor/opentype.min.js"></script>
@@ -134,6 +148,7 @@
   <script src="js/template.js"></script>
   <script src="js/motifs.js"></script>
   <script src="js/doorstyles.js"></script>
+  <script src="js/listing.js"></script>
   <script src="js/textpaths.js"></script>
   <script src="js/app.js"></script>
 </body>

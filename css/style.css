@@ -207,8 +207,8 @@ button.ghost {
 /* Preview colouring of the template layers (export overrides all this
    with explicit red/black attributes). */
 #preview .board {
-  fill: #e6c992;
-  stroke: #9a7443;
+  fill: var(--board, #e6c992);
+  stroke: var(--edge, #9a7443);
   stroke-width: 0.3;
 }
 
@@ -218,12 +218,72 @@ button.ghost {
 }
 
 #preview .ink {
-  fill: #3f2c16;
+  fill: var(--ink, #3f2c16);
   stroke: none;
 }
 
 #preview .ink-line {
   fill: none;
-  stroke: #3f2c16;
+  stroke: var(--ink, #3f2c16);
   stroke-width: 0.35;
+}
+
+/* ------------------------------ gallery ------------------------------ */
+
+#gallery {
+  width: 100%;
+  max-width: 1250px;
+  /* `auto` margins keep the top reachable when the gallery overflows the
+     centred flex stage. */
+  margin: auto;
+  padding: 10px 0 40px;
+}
+
+.gallery-bar {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.gallery-bar button {
+  width: auto;
+  margin: 0;
+  padding: 10px 18px;
+}
+
+.gallery-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+.gallery-card {
+  margin: 0;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.gallery-card img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.gallery-card figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.gallery-card figcaption button {
+  width: auto;
+  margin: 0;
+  padding: 7px 12px;
+  font-size: 12px;
 }

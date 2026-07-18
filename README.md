@@ -35,6 +35,13 @@ Creative Space, Inkscape, etc.
   **grand oak** (a full-card version whose canopy fills the top and whose
   blossoms drift down the margins), laurel wreath with the couple's
   initials, tiered wedding cake, mountain range, or wedding rings.
+- **Listing photo mode** – one click renders five Etsy-ready 2400×1800
+  marketing PNGs from your current design: a hero shot with headline copy
+  and optional brand line, a "no two are ever alike" grid of shuffled
+  variations, a five-wood-tone lineup (maple, golden oak, cherry, walnut,
+  birch — wood only), a four-style showcase, and an engraving close-up.
+  Everything is composed on a styled wood-table scene fully in the browser.
+  The wood-tone picker also recolours the live preview.
 - **One-of-a-kind by construction** – nearly everything is seeded-generative:
   both trees, the botanical border vine, the corner sprays, the wavy edge's
   wavelength, the crackle/floral/mandala door lace, the mountain range, the
@@ -93,6 +100,7 @@ js/lattice.js     seeded RNG, Delaunay triangulation, lace generation
 js/template.js    invitation geometry & text layout (all sizes in mm)
 js/motifs.js      swappable engraved graphics + border art (vine, sprays)
 js/doorstyles.js  gatefold door lace styles (floral vines, mandala fan)
+js/listing.js     listing photo mode (wood palettes, marketing scenes)
 js/textpaths.js   text → outline tracing for export (opentype.js)
 js/app.js         state, live preview, export & download
 fonts/            Great Vibes + Playfair Display (SIL Open Font License)

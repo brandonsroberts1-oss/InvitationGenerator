@@ -27,6 +27,8 @@ const state = {
   showDoors: true,
   showHeart: true,
   seed: 7,
+  woodTone: 'maple',
+  brand: '',
 };
 
 /** Fields rendered in small caps on the invitation. */
@@ -148,6 +150,13 @@ function download(text, filename) {
   setTimeout(() => URL.revokeObjectURL(url), 5000);
 }
 
+function downloadUrl(url, filename) {
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+}
+
 /* ------------------------------------------------------------------ */
 /* Wiring                                                              */
 /* ------------------------------------------------------------------ */
@@ -188,6 +197,91 @@ function bind() {
     state.seed = Math.floor(Math.random() * 1e9);
     render();
   });
+
+  // Wood tone recolours the live preview via CSS variables.
+  const woodSel = document.getElementById('woodTone');
+  for (const [id, w] of Object.entries(WOODS)) {
+    woodSel.append(new Option(w.label, id));
+  }
+  woodSel.value = state.woodTone;
+  const applyWood = () => {
+    const w = WOODS[state.woodTone];
+    previewBox.style.setProperty('--board', w.board);
+    previewBox.style.setProperty('--edge', w.edge);
+    previewBox.style.setProperty('--ink', w.ink);
+  };
+  woodSel.addEventListener('change', () => {
+    state.woodTone = woodSel.value;
+    applyWood();
+  });
+  applyWood();
+
+  const brandInput = document.getElementById('brand');
+  brandInput.value = state.brand;
+  brandInput.addEventListener('input', () => {
+    state.brand = brandInput.value;
+  });
+
+  // Listing photo mode.
+  const gallery = document.getElementById('gallery');
+  const listingStatus = document.getElementById('listing-status');
+  const listingBtn = document.getElementById('listing-mode');
+  listingBtn.addEventListener('click', async () => {
+    listingBtn.disabled = true;
+    try {
+      const items = await generateListingPhotos((msg) => {
+        listingStatus.textContent = msg;
+      });
+      listingStatus.textContent = 'Done - 5 images ready.';
+      showGallery(items);
+    } catch (err) {
+      listingStatus.textContent = 'Failed: ' + err.message;
+    } finally {
+      listingBtn.disabled = false;
+    }
+  });
+
+  function showGallery(items) {
+    previewBox.hidden = true;
+    gallery.hidden = false;
+
+    const header = document.createElement('div');
+    header.className = 'gallery-bar';
+    const back = document.createElement('button');
+    back.className = 'ghost';
+    back.textContent = '← Back to editor';
+    back.addEventListener('click', () => {
+      gallery.hidden = true;
+      previewBox.hidden = false;
+    });
+    const all = document.createElement('button');
+    all.className = 'primary';
+    all.textContent = 'Download all 5';
+    all.addEventListener('click', () => {
+      items.forEach((it, i) => setTimeout(() => downloadUrl(it.url, it.name), i * 400));
+    });
+    header.append(back, all);
+
+    const grid = document.createElement('div');
+    grid.className = 'gallery-grid';
+    for (const it of items) {
+      const card = document.createElement('figure');
+      card.className = 'gallery-card';
+      const img = document.createElement('img');
+      img.src = it.url;
+      img.alt = it.title;
+      const cap = document.createElement('figcaption');
+      const btn = document.createElement('button');
+      btn.className = 'ghost';
+      btn.textContent = 'Download PNG';
+      btn.addEventListener('click', () => downloadUrl(it.url, it.name));
+      cap.append(it.title, btn);
+      card.append(img, cap);
+      grid.append(card);
+    }
+    gallery.replaceChildren(header, grid);
+    window.__listingItems = items;
+  }
 
   const status = document.getElementById('export-status');
 
